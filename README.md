@@ -7,7 +7,7 @@ This project allows users to upload PDF files and ask questions about their cont
 1. Clone this repository:
 
 ```bash
-git clone https://github.com/your-username/pdf-question-answering.git
+git clone https://github.com/Aditya190803/Chat-with-PDF.git
 ```
 
 2. Install dependencies using pip:
