@@ -26,6 +26,7 @@ GROQ_API_KEY=your_groq_api_key
 
 Replace `your_groq_api_key` with your actual GROQ API key.
 
+Get your [API Key](https://console.groq.com/keys) from here  
 ## Usage
 
 1. Run the script:
