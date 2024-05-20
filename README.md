@@ -32,7 +32,7 @@ Get your [API Key](https://console.groq.com/keys) from here
 1. Run the script:
 
 ```bash
-python main.py
+chainlit app.py
 ```
 
 2. Upload a PDF file when prompted.
