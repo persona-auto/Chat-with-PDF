@@ -1,124 +1,96 @@
-import PyPDF2
-from langchain_community.embeddings import OllamaEmbeddings
+import streamlit as st
+from PyPDF2 import PdfReader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_community.vectorstores import Chroma
-from langchain.chains import ConversationalRetrievalChain
-from langchain.memory import ChatMessageHistory, ConversationBufferMemory
-import chainlit as cl
-from langchain_groq import ChatGroq
-from langchain_community.llms import Ollama
-
-
-from dotenv import load_dotenv
 import os
+from langchain_google_genai import GoogleGenerativeAIEmbeddings
+import google.generativeai as genai
+from langchain.vectorstores import FAISS
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain.chains.question_answering import load_qa_chain
+from langchain.prompts import PromptTemplate
+from dotenv import load_dotenv
 
-# Loading environment variables from .env file
-load_dotenv() 
+load_dotenv()
+os.getenv("GOOGLE_API_KEY")
+genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 
-# Function to initialize conversation chain with GROQ language model
-groq_api_key = os.environ['GROQ_API_KEY']
+def get_pdf_text(pdf_docs):
+    text=""
+    for pdf in pdf_docs:
+        pdf_reader= PdfReader(pdf)
+        for page in pdf_reader.pages:
+            text+= page.extract_text()
+    return  text
 
-# Initializing GROQ chat with provided API key, model name, and settings
-llm = ChatGroq( groq_api_key=groq_api_key, model_name="llama3-70b-8192",temperature=0.35)
 
-# Initializing Ollama language model
-#llm = Ollama(model="llama3")
 
-@cl.on_chat_start
-async def on_chat_start():
-    files = None
+def get_text_chunks(text):
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=10000, chunk_overlap=1000)
+    chunks = text_splitter.split_text(text)
+    return chunks
 
-    while files is None:
-        files = await cl.AskFileMessage(
-            content="Please upload a pdf file to begin!",
-            accept=["application/pdf"],
-            max_size_mb=100,
-            max_files=3,
-            timeout=180, 
-        ).send()
 
-    file = files[0] 
-    print(file) 
+def get_vector_store(text_chunks):
+    embeddings = GoogleGenerativeAIEmbeddings(model = "models/embedding-001")
+    vector_store = FAISS.from_texts(text_chunks, embedding=embeddings)
+    vector_store.save_local("faiss_index")
 
-    # Inform the user that processing has started
-    msg = cl.Message(content=f"Processing `{file.name}`...",)
-    await msg.send()
 
-    # Read the PDF file
-    pdf = PyPDF2.PdfReader(file.path)
-    pdf_text = ""
-    for page in pdf.pages:
-        pdf_text += page.extract_text()
-        
-    # Split the text into chunks
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1200, chunk_overlap=50)
-    texts = text_splitter.split_text(pdf_text)
+def get_conversational_chain():
 
-    # Create a metadata for each chunk
-    metadatas = [{"source": f"{i}-pl"} for i in range(len(texts))]
+    prompt_template = """
+    Answer the question as detailed as possible from the provided context, make sure to provide all the details, if the answer is not in
+    provided context just say, "answer is not available in the context", don't provide the wrong answer\n\n
+    Context:\n {context}?\n
+    Question: \n{question}\n
 
-    # Create a Chroma vector store
-    embeddings = OllamaEmbeddings(model="nomic-embed-text")
-    docsearch = await cl.make_async(Chroma.from_texts)(
-        texts, embeddings, metadatas=metadatas
-    )
+    Answer:
+    """
+
+    model = ChatGoogleGenerativeAI(model="gemini-pro",
+                             temperature=0.3)
+
+    prompt = PromptTemplate(template = prompt_template, input_variables = ["context", "question"])
+    chain = load_qa_chain(model, chain_type="stuff", prompt=prompt)
+
+    return chain
+
+def user_input(user_question):
+    embeddings = GoogleGenerativeAIEmbeddings(model = "models/embedding-001")
     
-    # Initialize message history for conversation
-    message_history = ChatMessageHistory()
+    new_db = FAISS.load_local("faiss_index", embeddings)
+    docs = new_db.similarity_search(user_question)
+
+    chain = get_conversational_chain()
+
     
-    # Memory for conversational context
-    memory = ConversationBufferMemory(
-        memory_key="chat_history",
-        output_key="answer",
-        chat_memory=message_history,
-        return_messages=True,
-    )
+    response = chain(
+        {"input_documents":docs, "question": user_question}
+        , return_only_outputs=True)
 
-    # Create a chain that uses the Chroma vector store
-    chain = ConversationalRetrievalChain.from_llm(
-        llm=llm,
-        chain_type="stuff",
-        retriever=docsearch.as_retriever(),
-        memory=memory,
-        return_source_documents=True,
-    )
+    print(response)
+    st.write("Reply: ", response["output_text"])
 
-    # Let the user know that the system is ready
-    msg.content = f"Processing `{file.name}` done. You can now ask questions!"
-    await msg.update()
-    #store the chain in user session
-    cl.user_session.set("chain", chain)
+def main():
+    st.set_page_config("Chat PDF")
+    st.header("Chat with PDF using Gemini💁")
+
+    user_question = st.text_input("Ask a Question from the PDF Files")
+
+    if user_question:
+        user_input(user_question)
+
+    with st.sidebar:
+        st.title("Menu:")
+        pdf_docs = st.file_uploader("Upload your PDF Files and Click on the Submit & Process Button", accept_multiple_files=True)
+        if st.button("Submit & Process"):
+            with st.spinner("Processing..."):
+                raw_text = get_pdf_text(pdf_docs)
+                text_chunks = get_text_chunks(raw_text)
+                get_vector_store(text_chunks)
+                st.success("Done")
 
 
-@cl.on_message
-async def main(message: cl.Message):
-     # Retrieve the chain from user session
-    chain = cl.user_session.get("chain") 
-    #call backs happens asynchronously/parallel 
-    cb = cl.AsyncLangchainCallbackHandler()
-    
-    # call the chain with user's message content
-    res = await chain.ainvoke(message.content, callbacks=[cb])
-    answer = res["answer"]
-    source_documents = res["source_documents"] 
 
-    text_elements = [] 
-        
-    # Process source documents if available
-    if source_documents:
-        for source_idx, source_doc in enumerate(source_documents):
-            source_name = f"source_{source_idx}"
-            # Create the text element referenced in the message
-            text_elements.append(
-                cl.Text(content=source_doc.page_content, name=source_name)
-            )
-        source_names = [text_el.name for text_el in text_elements]
-        
-         # Add source references to the answer
-        if source_names:
-            answer += f"\nSources: {', '.join(source_names)}"
-        else:
-            answer += "\nNo sources found"
-    #return results
-
-    await cl.Message(content=answer, elements=text_elements).send()
+if __name__ == "__main__":
+    main()
