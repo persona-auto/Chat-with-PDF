@@ -21,18 +21,18 @@ pip install -r requirements.txt
 Create a `.env` file in the root directory and add the following:
 
 ```plaintext
-GROQ_API_KEY=your_groq_api_key
+GOOGLE_API_KEY=your_google_api_key
 ```
 
 Replace `your_groq_api_key` with your actual GROQ API key.
 
-Get your [API Key](https://console.groq.com/keys) from here  
+Get your [API Key](https://aistudio.google.com/app/apikey) from here  
 ## Usage
 
 1. Run the script:
 
 ```bash
-chainlit app.py
+streamlit app.py
 ```
 
 2. Upload a PDF file when prompted.
@@ -44,7 +44,7 @@ chainlit app.py
 - PDF text extraction using PyPDF2.
 - Natural language processing using Langchain.
 - Conversational retrieval chain setup for question answering.
-- Asynchronous message handling using ChainLit.
+- Asynchronous message handling using streamlit.
 
 ## Limitations
 
