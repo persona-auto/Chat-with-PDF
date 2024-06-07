@@ -45,13 +45,13 @@ def get_conversational_chain():
 
     Answer:
     """
-    model = ChatGoogleGenerativeAI(model="gemini-pro", temperature=0.3)
+    model = ChatGoogleGenerativeAI(model="gemini-1.5-pro", temperature=0.35)
     prompt = PromptTemplate(template=prompt_template, input_variables=["context", "question"])
     chain = load_qa_chain(model, chain_type="stuff", prompt=prompt)
     return chain
 
 def get_gemini_fallback_chain():
-    model = ChatGoogleGenerativeAI(model="gemini-pro", temperature=0.7)
+    model = ChatGoogleGenerativeAI(model="gemini-1.5-pro", temperature=0.4)
     memory = ConversationBufferMemory()
     conversation = ConversationChain(
         llm=model,
@@ -60,7 +60,7 @@ def get_gemini_fallback_chain():
     return conversation
 
 def user_input(user_question):
-    embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+    embeddings = GoogleGenerativeAIEmbeddings(model="models/text-embedding-004")
     vector_store = st.session_state["vector_store"]
     docs = vector_store.similarity_search(user_question)
     chain = get_conversational_chain()
