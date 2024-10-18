@@ -50,7 +50,3 @@ streamlit app.py
 
 - Currently supports only PDF files.
 - Limited to text-based content in PDFs.
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
