@@ -24,7 +24,7 @@ Create a `.env` file in the root directory and add the following:
 GOOGLE_API_KEY=your_google_api_key
 ```
 
-Replace `your_groq_api_key` with your actual GROQ API key.
+Replace `your_google_api_key` with your actual GOOOGLE API key.
 
 Get your [API Key](https://aistudio.google.com/app/apikey) from here  
 ## Usage
